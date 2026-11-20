@@ -210,7 +210,7 @@ function akismet_admin_configure_form($form, &$form_state, $akismet_form = NULL)
   );
   $form['#attached'] = array(
     'js' => array(
-      backdrop_get_path('module', 'akismet') . '/akismet.admin.js',
+      backdrop_get_path('module', 'akismet') . '/js/akismet.admin.js',
     ),
   );
 
