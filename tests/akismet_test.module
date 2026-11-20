@@ -35,6 +35,10 @@ function akismet_test_autoload_info() {
 
 /**
  * Entity URI callback.
+ *
+ * @param object $record
+ *
+ * @return array
  */
 function akismet_test_uri($record) {
   return array(
@@ -293,6 +297,10 @@ function akismet_test_akismet_form_moderation(&$form, &$form_state) {
 
 /**
  * Loads a {akismet_test} data record by id.
+ *
+ * @param int $mid
+ *
+ * @return DatabaseStatementInterface
  */
 function akismet_test_load($mid) {
   return db_query('SELECT * FROM {akismet_test} WHERE mid = :mid', array(':mid' => $mid))->fetch();
@@ -300,6 +308,10 @@ function akismet_test_load($mid) {
 
 /**
  * Saves an {akismet_test} data record.
+ *
+ * @param object $record
+ *
+ * @return int
  */
 function akismet_test_save($record) {
   // Load the stored entity, if any.

@@ -82,8 +82,8 @@ function akismet_test_server_menu() {
 /**
  * Page callback; routes authenticated REST requests to the correct handler.
  *
- * @param $key
- * @param $endpoint
+ * @param string $key
+ * @param string $endpoint
  *
  * @return int|string
  */
@@ -149,7 +149,7 @@ function akismet_test_server_endpoint_verify_key() {
 /**
  * Endpoint handler for /comment-check.
  *
- * @param $params
+ * @param array $params
  *   The $_POST data from the request.
  *
  * @return string
@@ -218,7 +218,7 @@ function akismet_test_server_endpoint_comment_check($params) {
  *
  * @param string $type
  *   The type of feedback. Either 'spam' or 'ham'.
- * @param $params
+ * @param array $params
  *   The $_POST data from the request.
  *
  * @return string
@@ -255,6 +255,8 @@ function akismet_test_server_endpoint_submit_feedback($type, $params) {
 
 /**
  * Delivery callback for REST API endpoints.
+ *
+ * @param int $page_callback_result
  */
 function akismet_test_server_rest_deliver($page_callback_result) {
   // All fake-server responses are not cached.

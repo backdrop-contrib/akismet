@@ -8,7 +8,7 @@
 /**
  * Implements hook_requirements().
  *
- * @param $check
+ * @param bool $check
  *   (optional) Boolean whether to re-check the module's installation and
  *   configuration status. Defaults to TRUE, as this argument is not passed for
  *   hook_requirements() by default. Passing FALSE allows other run-time code

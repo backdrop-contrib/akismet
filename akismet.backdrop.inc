@@ -65,13 +65,13 @@ class AkismetBackdrop extends Akismet {
   public function getUserAgentInformation() {
     // Retrieve Backdrop distribution and installation profile information.
     $profile = backdrop_get_profile();
-    $profile_info = system_get_info('module', $profile) + array(
+    $profile_info = (array) system_get_info('module', $profile) + array(
       'distribution_name' => 'Backdrop',
       'version' => VERSION,
     );
 
     // Retrieve Akismet module information.
-    $akismet_info = system_get_info('module', 'akismet');
+    $akismet_info = (array) system_get_info('module', 'akismet');
     if (empty($akismet_info['version'])) {
       // Manually build a module version string for repository checkouts.
       $akismet_info['version'] = BACKDROP_CORE_COMPATIBILITY . '-2.x-dev';
@@ -233,8 +233,14 @@ class AkismetBackdropTestLocal extends AkismetBackdropTest {
  */
 class AkismetBackdropTestInvalid extends AkismetBackdropTestLocal {
 
+  /**
+   * @var int
+   */
   private $currentAttempt = 0;
 
+  /**
+   * @var string
+   */
   private $originalServer;
 
   /**

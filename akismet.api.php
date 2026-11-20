@@ -225,7 +225,7 @@
  * that can be protected. Only forms that have been registered via this hook are
  * configurable in Akismet's administration interface.
  *
- * @return
+ * @return array
  *   An associative array containing information about the forms that can be
  *   protected, keyed by $form_id:
  *   - title: The human-readable name of the form.
@@ -306,7 +306,7 @@ function hook_akismet_form_list() {
 /**
  * Alter the list of forms that can be protected by Akismet.
  *
- * @param &$form_list
+ * @param array &$form_list
  *   An associative array containing information about the forms that can be
  *   protected, keyed by $form_id. See hook_akismet_form_list() for details.
  */
@@ -319,10 +319,10 @@ function hook_akismet_form_list_alter(&$form_list) {
 /**
  * Return information about a form that can be protected by Akismet.
  *
- * @param $form_id
+ * @param string $form_id
  *   The form id to return information for.
  *
- * @return
+ * @return array
  *   An associative array describing the form identified by $form_id:
  *   - bypass access: (optional) A list of user permissions to check for the
  *     current user to determine whether to protect the form with Akismet or do
@@ -417,10 +417,10 @@ function hook_akismet_form_info($form_id) {
 /**
  * Alter registered information about a form that can be protected by Akismet.
  *
- * @param &$form_info
+ * @param array &$form_info
  *   An associative array describing the protectable form. See
  *   hook_akismet_form_info() for details.
- * @param $form_id
+ * @param string $form_id
  *   The $form_id of the form.
  */
 function hook_akismet_form_info_alter(&$form_info, $form_id) {

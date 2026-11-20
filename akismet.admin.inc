@@ -10,6 +10,11 @@
  *
  * On all Akismet administration pages, check the module configuration and
  * display the corresponding requirements error, if invalid.
+ *
+ * @param bool $force
+ * @param bool $update
+ *
+ * @return array
  */
 function akismet_admin_site_status($force = FALSE, $update = FALSE) {
   $status = _akismet_status($force, $update);
@@ -45,7 +50,7 @@ function akismet_admin_form_list() {
   );
   $result = db_query('SELECT form_id FROM {akismet_form}')->fetchCol();
   $forms = array();
-  $module_info = system_get_info('module');
+  $module_info = (array) system_get_info('module');
   foreach ($result as $form_id) {
     $forms[$form_id] = akismet_form_load($form_id);
     // system_get_info() only supports enabled modules. Default to the module's
@@ -119,6 +124,8 @@ function akismet_admin_form_list() {
 
 /**
  * Return registered forms as an array suitable for a 'checkboxes' form element #options property.
+ *
+ * @return array
  */
 function akismet_admin_form_options() {
   // Retrieve all registered forms.
@@ -137,7 +144,7 @@ function akismet_admin_form_options() {
   }
 
   // Load module information.
-  $module_info = system_get_info('module');
+  $module_info = (array) system_get_info('module');
 
   // Transform form information into an associative array suitable for #options.
   $options = array();
@@ -530,7 +537,7 @@ function akismet_admin_settings($form, &$form_state) {
     '#required' => TRUE,
   );
   $form['#submit'][] = 'akismet_admin_settings_prepare_submit';
-  $form = system_settings_form($form);
+  $form = (array) system_settings_form($form);
   $form['#submit'][] = 'akismet_admin_settings_submit';
   return $form;
 }

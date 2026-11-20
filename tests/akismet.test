@@ -14,11 +14,20 @@ class AkismetWebTestCase extends BackdropWebTestCase {
   /**
    * A user with permission to bypass node access and administer nodes.
    *
-   * @var object
+   * @var User
    */
   protected $admin_user;
 
+  /**
+   * @var User
+   */
+  protected $web_user;
+
   protected $useProductionKey = FALSE;
+
+  protected $responseIds = array();
+
+  protected $messages = array();
 
   /**
    * The text the user should see when they are blocked from submitting a form
@@ -35,6 +44,11 @@ class AkismetWebTestCase extends BackdropWebTestCase {
    * The API key used during testing.
    */
   protected $key = 'valid-key';
+
+  /**
+   * @var Akismet
+   */
+  protected $akismet;
 
   /**
    * The Akismet client class implementation to use.
@@ -144,7 +158,7 @@ class AkismetWebTestCase extends BackdropWebTestCase {
    * All watchdog messages with a higher severity than WATCHDOG_NOTICE are
    * considered as "severe".
    *
-   * @param $max_severity
+   * @param int $max_severity
    *   (optional) A maximum watchdog severity level message constant that log
    *   messages must have to pass the assertion. All messages with a higher
    *   severity will fail. Defaults to WATCHDOG_NOTICE. If a severity level
@@ -216,11 +230,11 @@ class AkismetWebTestCase extends BackdropWebTestCase {
    * with a different Akismet server (due to a refreshed server list or being
    * redirected), then we will get a new session_id.
    *
-   * @param $type
+   * @param string $type
    *   The type of ID to assert; e.g., 'content_id', 'captcha_id'.
-   * @param $id
+   * @param string $id
    *   The ID of $type in the last request, as returned from Akismet.
-   * @param $new_expected
+   * @param bool $new_expected
    *   (optional) Boolean indicating whether a new ID is expected; e.g., after
    *   incorrectly solving a CAPTCHA.
    */
@@ -242,7 +256,7 @@ class AkismetWebTestCase extends BackdropWebTestCase {
   /**
    * Reset the statically cached Akismet session id.
    *
-   * @param $type
+   * @param string|null $type
    *   The type of ID to reset; e.g., 'content_id', 'captcha_id'.
    */
   protected function resetResponseID($type = NULL) {
@@ -270,9 +284,9 @@ class AkismetWebTestCase extends BackdropWebTestCase {
    * - The return value of this function is used to invoke assertAkismetData(),
    *   to verify that the proper session id was stored in the database.
    *
-   * @param $type
+   * @param string $type
    *   The type of ID to assert; e.g., 'content_id', 'captcha_id'.
-   * @param $new_expected
+   * @param bool $new_expected
    *   (optional) Boolean indicating whether a new ID is expected; e.g., after
    *   incorrectly solving a CAPTCHA.
    */
@@ -284,13 +298,14 @@ class AkismetWebTestCase extends BackdropWebTestCase {
   /**
    * Instantiate a Akismet client and make it available on $this->akismet;
    *
-   * @param $force
+   * @param bool $force
    *   (Optional) If true, then a new class is always instantiated.
    */
   protected function getClient($force = FALSE) {
     if ($force || !isset($this->akismet)) {
       // akismet.module may not be enabled in the parent site executing the test.
       backdrop_load('module', 'akismet');
+      /** @var Akismet */
       $this->akismet = akismet($this->akismetClass, $force);
     }
     return $this->akismet;
@@ -336,15 +351,13 @@ class AkismetWebTestCase extends BackdropWebTestCase {
   /**
    * Configure Akismet protection for a given form.
    *
-   * @param $form_id
+   * @param string $form_id
    *   The form id to configure.
-   * @param $mode
-   *   The Akismet protection mode for the form.
-   * @param $fields
+   * @param array|null $fields
    *   (optional) A list of form elements to enable for text analysis. If
    *   omitted and the form registers individual elements, all fields are
    *   enabled by default.
-   * @param $edit
+   * @param array $edit
    *   (optional) An array of POST data to pass through to backdropPost() when
    *   configuring the form's protection.
    */
@@ -393,7 +406,7 @@ class AkismetWebTestCase extends BackdropWebTestCase {
   /**
    * Remove Akismet protection for a given form.
    *
-   * @param $form_id
+   * @param string $form_id
    *   The form id to configure.
    */
   protected function delProtection($form_id) {
@@ -409,13 +422,13 @@ class AkismetWebTestCase extends BackdropWebTestCase {
   /**
    * Assert that Akismet session data was stored for a submission.
    *
-   * @param $entity
+   * @param string $entity
    *   The entity type to search for in {akismet}.
-   * @param $id
+   * @param int $id
    *   The entity id to search for in {akismet}.
-   * @param $response_type
+   * @param string $response_type
    *   (optional) The type of ID to assert; e.g., 'content_id', 'captcha_id'.
-   * @param $response_id
+   * @param int|null $response_id
    *   (optional) The ID of $type to assert additionally.
    */
   protected function assertAkismetData($entity, $id, $response_type = '', $response_id = NULL) {
@@ -458,18 +471,18 @@ class AkismetWebTestCase extends BackdropWebTestCase {
   /**
    * Test submitting a form with 'spam' values.
    *
-   * @param $url
+   * @param string $url
    *   The URL of the form, or NULL to use the current page.
-   * @param $spam_fields
+   * @param array $spam_fields
    *   An array of form field names to inject spam content into.
-   * @param $edit
+   * @param array $edit
    *   An array of non-spam form values used in backdropPost().
-   * @param $button
+   * @param string $button
    *   The text of the form button to click in backdropPost().
-   * @param $success_message
+   * @param string $success_message
    *   An optional message to test does not appear after submission.
    */
-  protected function assertSpamSubmit($url, array $spam_fields, array $edit = array(), $button, $success_message = '') {
+  protected function assertSpamSubmit($url, array $spam_fields, ?array $edit = array(), $button, $success_message = '') {
     // NOTE: This will not work with the live API.
     $edit += array_fill_keys($spam_fields, 'spam');
     $this->backdropPost($url, $edit, $button);
@@ -482,18 +495,18 @@ class AkismetWebTestCase extends BackdropWebTestCase {
   /**
    * Test submitting a form with 'ham' values.
    *
-   * @param $url
+   * @param string $url
    *   The URL of the form, or NULL to use the current page.
-   * @param $ham_fields
+   * @param array $ham_fields
    *   An array of form field names to inject ham content into.
-   * @param $edit
+   * @param array $edit
    *   An array of non-spam form values used in backdropPost().
-   * @param $button
+   * @param string $button
    *   The text of the form button to click in backdropPost().
-   * @param $success_message
+   * @param string $success_message
    *   An optional message to test does appear after submission.
    */
-  protected function assertHamSubmit($url, array $ham_fields, array $edit = array(), $button, $success_message = '') {
+  protected function assertHamSubmit($url, array $ham_fields, ?array $edit = array(), $button, $success_message = '') {
     // Note: There is no way to force a ham response from the live API, but
     // it will usually return a ham response for content that looks like
     // it's just a test comment.
@@ -508,19 +521,19 @@ class AkismetWebTestCase extends BackdropWebTestCase {
   /**
    * Test submitting a form with unsure values and resulting CAPTCHA submissions.
    *
-   * @param $url
+   * @param string $url
    *   The URL of the form, or NULL to use the current page.
-   * @param $unsure_fields
+   * @param array $unsure_fields
    *   An array of form field names to inject unsure content into.
-   * @param $edit
+   * @param array $edit
    *   An array of non-spam form values used in backdropPost().
-   * @param $button
+   * @param string $button
    *   The text of the form button to click in backdropPost().
-   * @param $success_message
+   * @param string $success_message
    *   An optional message to test does appear after successful form and CAPTCHA
    *   submission.
    */
-  protected function assertUnsureSubmit($url, array $unsure_fields, array $edit = array(), $button, $success_message = '') {
+  protected function assertUnsureSubmit($url, array $unsure_fields, ?array $edit = array(), $button, $success_message = '') {
     $edit += array_fill_keys($unsure_fields, 'viagra-test-123');
     $this->backdropPost($url, $edit, $button);
     return;
@@ -639,10 +652,10 @@ class AkismetWebTestCase extends BackdropWebTestCase {
   /**
    * Retrieve sent request parameter values from testing server implementation.
    *
-   * @param $resource
+   * @param string $resource
    *   (optional) The resource name to retrieve submitted values from. Defaults
    *   to 'content'.
-   * @param $retain
+   * @param bool $retain
    *   (optional) Whether to retain the (last) record being read. Defaults to
    *   FALSE; i.e., the record being read is removed.
    *
@@ -668,7 +681,7 @@ class AkismetWebTestCase extends BackdropWebTestCase {
   /**
    * Resets recorded XML-RPC values.
    *
-   * @param $resource
+   * @param string $resource
    *   (optional) The resource name to reset records of. Defaults to 'content'.
    *
    * @see AkismetWebTestCase::getServerRecord()
@@ -685,11 +698,13 @@ class AkismetWebTestCase extends BackdropWebTestCase {
   /**
    * Wraps backdropGet() for additional watchdog message assertion.
    *
-   * @param $options
+   * @param string $path
+   * @param array $options
    *   In addition to regular $options that are passed to url():
    *   - watchdog: (optional) Boolean whether to assert that only non-severe
    *     watchdog messages have been logged. Defaults to TRUE. Use FALSE to
    *     negate the watchdog message severity assertion.
+   * @param array $headers
    *
    * @see BackdropWebTestCase->backdropGet()
    * @see AkismetWebTestCase->assertAkismetWatchdogMessages()
@@ -705,11 +720,18 @@ class AkismetWebTestCase extends BackdropWebTestCase {
   /**
    * Wraps backdropPost() for additional watchdog message assertion.
    *
-   * @param $options
+   * @param string|null $path
+   * @param array $edit
+   * @param string $submit
+   * @param array $options
    *   In addition to regular $options that are passed to url():
    *   - watchdog: (optional) Boolean whether to assert that only non-severe
    *     watchdog messages have been logged. Defaults to TRUE. Use FALSE to
    *     negate the watchdog message severity assertion.
+   * @param array $options
+   * @param array $headers
+   * @param string|null $form_html_id
+   * @param string|null $extra_post
    *
    * @see AkismetWebTestCase->assertAkismetWatchdogMessages()
    * @see AkismetWebTestCase->assertResponseID()
@@ -731,14 +753,14 @@ class AkismetWebTestCase extends BackdropWebTestCase {
    * Checks to see whether two values, which belong to the same variable name or
    * identifier, are equal and logs a readable assertion message.
    *
-   * @param $name
+   * @param string $name
    *   A name or identifier to use in the assertion message.
-   * @param $first
+   * @param string $first
    *   The first value to check.
-   * @param $second
+   * @param string $second
    *   The second value to check.
    *
-   * @return
+   * @return bool
    *   TRUE if the assertion succeeded, FALSE otherwise.
    *
    * @see AkismetWebTestCase::assertNotSame()
@@ -762,11 +784,11 @@ class AkismetWebTestCase extends BackdropWebTestCase {
    * Checks to see whether two values, which belong to the same variable name or
    * identifier, are not equal and logs a readable assertion message.
    *
-   * @param $name
+   * @param string $name
    *   A name or identifier to use in the assertion message.
-   * @param $first
+   * @param string $first
    *   The first value to check.
-   * @param $second
+   * @param string $second
    *   The second value to check.
    *
    * @return
@@ -796,7 +818,7 @@ class AkismetWebTestCase extends BackdropWebTestCase {
   /**
    * Asserts a successful akismet_test_form submission.
    *
-   * @param $old_mid
+   * @param int|null $old_mid
    *   (optional) The existing test record id to assert.
    */
   protected function assertTestSubmitData($old_mid = NULL) {
@@ -817,11 +839,11 @@ class AkismetWebTestCase extends BackdropWebTestCase {
    * one if an index is given. Match is case sensitive with normalized space.
    * The label is translated label.
    *
-   * @param $label
+   * @param string $label
    *   Text between the anchor tags.
-   * @param $index
+   * @param int $index
    *   Link position counting from zero.
-   * @return
+   * @return string|false
    *   Url on success, or FALSE if not found.
    */
   protected function getLink($label, $index = 0) {
@@ -852,7 +874,7 @@ class AkismetTestingModeTestCase extends AkismetWebTestCase {
 
     // Enable testing mode warnings.
     $config = config('akismet.settings');
-    $config->clear('akismet.settings', 'akismet_testing_mode_omit_warning');
+    $config->clear('akismet_testing_mode_omit_warning');
     $config->save();
 
     $this->admin_user = $this->backdropCreateUser(array(
@@ -1173,7 +1195,7 @@ class AkismetAccessTestCase extends AkismetWebTestCase {
     // Check access for a user that has everything except the 'administer
     // akismet' permission. This user should not have access to the Akismet
     // settings page.
-    $this->web_user = $this->backdropCreateUser(array_diff(module_invoke_all('perm'), array('administer akismet')));
+    $this->web_user = $this->backdropCreateUser(array_diff((array) module_invoke_all('perm'), array('administer akismet')));
     $this->backdropLogin($this->web_user);
     $this->backdropGet('admin/config/content/akismet', array('watchdog' => WATCHDOG_WARNING));
     $this->assertResponse(403);
@@ -1650,6 +1672,9 @@ class AkismetFormConfigurationTestCase extends AkismetWebTestCase {
 class AkismetNodeFormTestCase extends AkismetWebTestCase {
   protected $profile = 'standard';
 
+  /**
+   * @var Node
+   */
   private $node;
 
   function setUp() {
@@ -1754,6 +1779,11 @@ class AkismetNodeFormTestCase extends AkismetWebTestCase {
 
 class AkismetCommentFormTestCase extends AkismetWebTestCase {
 
+  /**
+   * @var Node
+   */
+  protected $node;
+
   function setUp() {
     parent::setUp(array('comment'));
 
@@ -1825,6 +1855,10 @@ class AkismetCommentFormTestCase extends AkismetWebTestCase {
    * Return the number of comments for a node of the given node ID.  We
    * can't use comment_num_all() here, because that is statically cached
    * and therefore will not work correctly with the SimpleTest browser.
+   *
+   * @param int $nid
+   *
+   * @return DatabaseStatementInterface
    */
   private function getCommentCount($nid) {
     return db_query('SELECT comment_count FROM {node_comment_statistics} WHERE nid = :nid', array(':nid' => $nid))->fetchField();
@@ -1833,11 +1867,11 @@ class AkismetCommentFormTestCase extends AkismetWebTestCase {
   /**
    * Test that the number of comments for a node matches an expected value.
    *
-   * @param $nid
+   * @param int $nid
    *   A node ID
-   * @param $expected
+   * @param int $expected
    *   An integer with the expected number of comments for the node.
-   * @param $message
+   * @param string $message
    *   An optional string with the message to be used in the assertion.
    */
   protected function assertCommentCount($nid, $expected, $message = '') {
@@ -1905,7 +1939,7 @@ class AkismetActionsTestCase extends AkismetWebTestCase {
       $data = akismet_data_load('comment', $comment->cid);
       $guids[] = $data->guid;
     }
-    $comment_entities = entity_load('comment', $cids);
+    $comment_entities = entity_load_multiple('comment', $cids);
 
     // Verify that all comments are currently published.
     $published = db_query('SELECT * FROM {comment} WHERE cid IN (:cids) AND status = 1', array(':cids' => $cids))->fetchAll();
@@ -1947,7 +1981,7 @@ class AkismetActionsTestCase extends AkismetWebTestCase {
       $data = akismet_data_load('node', $node->nid);
       $guids[] = $data->guid;
     }
-    $node_entities = entity_load('node', $nids);
+    $node_entities = entity_load_multiple('node', $nids);
 
     // Verify that all nodes are currently published.
     $published = db_query('SELECT * FROM {node} WHERE nid IN (:nids) AND status = 1', array(':nids' => $nids))->fetchAll();
@@ -2255,6 +2289,21 @@ class AkismetAnalysisPageCachingTestCase extends AkismetWebTestCase {
 class AkismetReportTestCase extends AkismetWebTestCase {
 
   protected $profile = 'standard';
+
+  /**
+   * @var Node
+   */
+  protected $node;
+
+  /**
+   * @var Comment
+   */
+  protected $comment;
+
+  /**
+   * @var array
+   */
+  protected $comments;
 
   function setUp() {
     parent::setUp(array('comment'));

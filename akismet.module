@@ -190,10 +190,10 @@ function akismet_menu() {
 /**
  * Menu access callback; Checks if the module is operational.
  *
- * @param $permission
+ * @param string|false $permission
  *   An optional permission string to check with user_access().
  *
- * @return
+ * @return bool
  *   TRUE if the module has been configured and user_access() has been checked,
  *   FALSE otherwise.
  */
@@ -208,9 +208,9 @@ function _akismet_access($permission = FALSE) {
 /**
  * Menu access callback; Determine access to report to Akismet.
  *
- * @param $entity
+ * @param string $entity
  *   The entity type of the data to report.
- * @param $id
+ * @param int $id
  *   The entity id of the data to report.
  *
  * @todo Revamp this based on new {akismet}.form_id info.
@@ -291,9 +291,9 @@ function akismet_cron() {
 /**
  * Load a Akismet data record from the database.
  *
- * @param $entity
+ * @param string $entity
  *   The entity type to retrieve data for.
- * @param $id
+ * @param int $id
  *   The entity id to retrieve data for.
  *
  * @return stdClass
@@ -309,7 +309,7 @@ function akismet_data_load($entity, $id) {
 /**
  * Loads the Akismet data records from the database for a specific entity type.
  *
- * @param $entity
+ * @param string $type
  *   The entity type to retrieve data for.
  *
  * @return array
@@ -331,7 +331,7 @@ function akismet_entity_type_load($type) {
  * anyone; $id is expected to be a Akismet session id instead of an entity id
  * then.
  *
- * @param $data
+ * @param object $data
  *   An object containing Akismet session data for the entity, containing at
  *   least the following properties:
  *   - entity: The entity type of the data to save.
@@ -364,9 +364,9 @@ function akismet_data_save($data) {
 /**
  * Updates stored Akismet session data to mark a bad post as moderated.
  *
- * @param $entity
+ * @param string $entity
  *   The entity type of the moderated post.
- * @param $id
+ * @param int $id
  *   The entity id of the moderated post.
  */
 function akismet_data_moderate($entity, $id) {
@@ -387,9 +387,9 @@ function akismet_data_moderate($entity, $id) {
 /**
  * Deletes a Akismet session data record from the database.
  *
- * @param $entity
+ * @param string $entity
  *   The entity type to delete data for.
- * @param $id
+ * @param int $id
  *   The entity id to delete data for.
  */
 function akismet_data_delete($entity, $id) {
@@ -399,9 +399,9 @@ function akismet_data_delete($entity, $id) {
 /**
  * Deletes multiple Akismet session data records from the database.
  *
- * @param $entity
+ * @param string $entity
  *   The entity type to delete data for.
- * @param $ids
+ * @param array $ids
  *   An array of entity ids to delete data for.
  */
 function akismet_data_delete_multiple($entity, array $ids) {
@@ -463,12 +463,14 @@ function akismet_data_delete_form_submit($form, &$form_state) {
 /**
  * Sends feedback for a Akismet session data record.
  *
- * @param $entity
+ * @param string $entity
  *   The entity type to send feedback for.
- * @param $id
+ * @param int $id
  *   The entity id to send feedback for.
- * @param $feedback
+ * @param string $feedback
  *   The feedback reason for reporting content.
+ *
+ * @return bool
  */
 function akismet_data_report($entity, $id, $feedback) {
   return akismet_data_report_multiple($entity, array($id), $feedback);
@@ -477,11 +479,11 @@ function akismet_data_report($entity, $id, $feedback) {
 /**
  * Sends feedback for multiple Akismet session data records.
  *
- * @param $entity
+ * @param string $entity
  *   The entity type to send feedback for.
- * @param $ids
+ * @param array $ids
  *   An array of entity ids to send feedback for.
- * @param $feedback
+ * @param string $feedback
  *   The feedback reason for reporting content: either 'spam' or 'ham'
  *
  * @return bool
@@ -646,11 +648,11 @@ function akismet_form_alter(&$form, &$form_state, $form_id) {
 /**
  * Returns a cached mapping of protected and delete confirmation form ids.
  *
- * @param $reset
+ * @param bool $reset
  *   (optional) Boolean whether to reset the static cache, flush the database
  *   cache, and return nothing (TRUE). Defaults to FALSE.
  *
- * @return
+ * @return array
  *   An associative array containing:
  *   - protected: An associative array whose keys are protected form IDs and
  *     whose values are the corresponding module names the form belongs to.
@@ -714,6 +716,8 @@ function akismet_form_cache($reset = FALSE) {
 
 /**
  * Returns a list of protectable forms registered via hook_akismet_form_info().
+ *
+ * @return array
  */
 function akismet_form_list() {
   $form_list = array();
@@ -738,11 +742,11 @@ function akismet_form_list() {
 /**
  * Returns information about a form registered via hook_akismet_form_info().
  *
- * @param $form_id
+ * @param string $form_id
  *   The form id to return information for.
- * @param $module
+ * @param string $module
  *   The module name $form_id belongs to.
- * @param array $form_list
+ * @param array|null $form_list
  *   (optional) The return value of hook_akismet_form_list() of $module, if
  *   already known. Primarily used by akismet_form_load().
  */
@@ -827,7 +831,7 @@ function akismet_form_info_add_fields(&$form_info, $entity_type, $bundle) {
 
   if (!empty($entity_info['fieldable'])) {
     // Add form element mappings for any text fields attached to the bundle.
-    $fields = field_info_fields();
+    $fields = (array) field_info_fields();
     foreach (field_info_instances($entity_type, $bundle) as $field_name => $field) {
       if (in_array($fields[$field_name]['type'], array('text', 'text_long', 'text_with_summary'))) {
         $form_info['elements'][$field_name] = check_plain(t($field['label']));
@@ -839,8 +843,10 @@ function akismet_form_info_add_fields(&$form_info, $entity_type, $bundle) {
 /**
  * Creates a bare Akismet form configuration.
  *
- * @param $form_id
+ * @param string $form_id
  *   The form ID to create the Akismet form configuration for.
+ *
+ * @return array
  */
 function akismet_form_new($form_id) {
   $akismet_form = array();
@@ -859,6 +865,10 @@ function akismet_form_new($form_id) {
 
 /**
  * Menu argument loader; Loads Akismet configuration and form information for a given form id.
+ *
+ * @param string $form_id
+ *
+ * @return array
  */
 function akismet_form_load($form_id) {
   $cid = 'akismet:form:' . $form_id;
@@ -896,6 +906,11 @@ function akismet_form_load($form_id) {
 
 /**
  * Saves an Akismet form configuration.
+ *
+ * @param array $akismet_form
+ *   Passed by reference.
+ *
+ * @return int|false
  */
 function akismet_form_save(&$akismet_form) {
   $exists = db_query_range('SELECT 1 FROM {akismet_form} WHERE form_id = :form_id', 0, 1, array(':form_id' => $akismet_form['form_id']))->fetchField();
@@ -917,6 +932,8 @@ function akismet_form_save(&$akismet_form) {
 
 /**
  * Deletes an Akismet form configuration.
+ *
+ * @param string $form_id
  */
 function akismet_form_delete($form_id) {
   $akismet_form = akismet_form_load($form_id);
@@ -956,14 +973,14 @@ function akismet_form_delete($form_id) {
  *
  * @see hook_akismet_form_info()
  *
- * @param $form_state
+ * @param array $form_state
  *   An associative array containing
  *   - values: The submitted form values.
  *   - buttons: A list of button form elements. See form_state_values_clean().
- * @param $fields
+ * @param array $fields
  *   A list of strings representing form elements to extract. Nested fields are
  *   in the form of 'parent][child'.
- * @param $mapping
+ * @param array $mapping
  *   An associative array of form elements to map to Akismet's dedicated data
  *   properties. See hook_akismet_form_info() for details.
  *
@@ -1156,6 +1173,10 @@ function akismet_form_get_values(&$form_state, $fields, $mapping) {
  *
  * Takes a potentially nested array and returns all non-empty string values in
  * nested keys as new indexed array.
+ *
+ * @param array $values
+ *
+ * @return array
  */
 function _akismet_flatten_form_values($values) {
   $flat_values = array();
@@ -1185,9 +1206,9 @@ function _akismet_flatten_form_values($values) {
 /**
  * Helper function to determine protected forms for an entity.
  *
- * @param $type
+ * @param string $type
  *   The type of entity to check.
- * @param $bundle
+ * @param array $bundle
  *   An array of bundle names to check.
  *
  * @return array
@@ -1499,6 +1520,10 @@ function akismet_validate_analysis(&$form, &$form_state) {
 
 /**
  * Removes possibly sensitive entries from an array of $_SERVER data.
+ *
+ * @param array $server_vars
+ *
+ * @return array
  */
 function _akismet_prepare_server_vars($server_vars) {
   static $safe_to_send = array(
@@ -1592,10 +1617,10 @@ function akismet_form_submit($form, &$form_state) {
 /**
  * Instantiates a new Akismet client.
  *
- * @param $class
+ * @param string|null $class
  *   (optional) The name of a Akismet client implementation class to instantiate.
  *   Overrides the 'akismet_class' configuration variable. Debug use only.
- * @param $force
+ * @param bool $force
  *   (optional) If true, then a new class is always instantiated.
  *
  * @return Akismet
@@ -1634,7 +1659,7 @@ function akismet($class = NULL, $force = FALSE) {
  * This collection expects that at least one entry is logged that contains the
  * primary log message and its severity.
  *
- * @param array $entry
+ * @param array|null $entry
  *   (optional) An associative array describing the entry to add to the log.
  *   If supplied, the special keys 'message' and 'arguments' are taken over as
  *   primary log message. All other key/value pairs will be appended to the
@@ -1657,7 +1682,7 @@ function akismet($class = NULL, $force = FALSE) {
  *
  * @see akismet_exit()
  */
-function akismet_log(array $entry = NULL, $severity = NULL, $reset = FALSE) {
+function akismet_log(?array $entry = NULL, $severity = NULL, $reset = FALSE) {
   // Start with debug severity level.
   $log = &backdrop_static(__FUNCTION__, array());
 
@@ -1720,13 +1745,13 @@ function akismet_log_write() {
 /**
  * Log an Akismet system message.
  *
- * @param $log
- *   @todo A list of message parts. Each item is an associative array whose keys are
- *   log message strings and whose corresponding values are t()-style
- *   replacement token arguments. At least one part is required.
- *
  * In essence, this is a poor man's YAML implementation (give or take some
  * details, but note especially the indentation for array sub-elements).
+ *
+ * @param array $log
+ *   A list of message parts. Each item is an associative array whose keys are
+ *   log message strings and whose corresponding values are t()-style
+ *   replacement token arguments. At least one part is required.
  */
 function _akismet_format_log(array $log) {
   $message = isset($log['message']) ? $log['message'] : '';
@@ -1848,9 +1873,9 @@ function _akismet_format_log(array $log) {
  *
  * Backported from Drupal 8.
  *
- * @param $string
+ * @param string $string
  *   A string containing placeholders.
- * @param $args
+ * @param array $args
  *   An associative array of replacements to make. Occurrences in $string of
  *   any key in $args are replaced with the corresponding value, after
  *   sanitization. The sanitization function depends on the first character of
@@ -1861,6 +1886,8 @@ function _akismet_format_log(array $log) {
  *     displayed on a page on the site.
  *   - %variable: Escaped as a placeholder for user-submitted content using
  *     backdrop_placeholder(), which shows up as <em>emphasized</em> text.
+ *
+ * @return string
  *
  * @see t()
  * @ingroup sanitization
@@ -1895,7 +1922,7 @@ function _akismet_format_string($string, array $args = array()) {
  *   - entity: The entity type of the data in the record.
  *   - id: The entity id.
  *   - request: The original request data sent to Akismet.
- * @param $reason
+ * @param string $reason
  *   The feedback to send: either 'spam' or 'ham'.
  *
  * @return int|string
@@ -1924,7 +1951,7 @@ function _akismet_send_feedback($data, $reason = 'spam') {
 /**
  * Fetch the site's Akismet statistics from the API.
  *
- * @param $refresh
+ * @param bool $refresh
  *   A boolean if TRUE, will force the statistics to be re-fetched and stored
  *   in the cache.
  *
@@ -1950,6 +1977,9 @@ function akismet_get_statistics($refresh = FALSE) {
       ));
 
       foreach ($statistics as $statistic) {
+        // @todo the method does not exist - either create one based on Akismet
+        // API or remove.
+        /** @var Akismet */
         $result = akismet()->getStatistics(array('type' => $statistic));
         if ($result === Akismet::NETWORK_ERROR || $result === Akismet::AUTH_ERROR) {
           // If there was an error, stop fetching statistics and store FALSE
@@ -2112,7 +2142,7 @@ function node_akismet_form_info($form_id) {
     ),
   );
   // @see node_permission()
-  if (in_array($type->type, node_permissions_get_configured_types())) {
+  if (in_array($type->type, (array) node_permissions_get_configured_types())) {
     $form_info['bypass access'][] = 'edit any ' . $type->type . ' content';
     $form_info['bypass access'][] = 'delete any ' . $type->type . ' content';
   }
@@ -2160,8 +2190,10 @@ function akismet_form_node_multiple_delete_confirm_submit($form, &$form_state) {
 /**
  * Entity report access callback for nodes.
  *
- * @param $entity
+ * @param Entity|null $entity
  *   Optional entity object to check access to a specific entity.
+ *
+ * @return bool
  */
 function node_akismet_entity_report_access($entity = NULL) {
   // All nodes can be reported as long as the user has access to view.
@@ -2177,8 +2209,10 @@ function node_akismet_entity_report_access($entity = NULL) {
 /**
  * Entity context created callback for nodes.
  *
- * @param $id
+ * @param int|null $id
  *   The id of the node.
+ *
+ * @return string|false
  */
 function node_akismet_context_created($id = NULL) {
   if (empty($id)) {
@@ -2251,8 +2285,10 @@ function comment_akismet_form_info($form_id) {
 /**
  * Entity report access callback for comments.
  *
- * @param $entity
+ * @param Entity $entity
  *   Optional entity object to check access to a specific entity.
+ *
+ * @return bool
  */
 function comment_akismet_entity_report_access($entity = NULL) {
   // All comments can be reported as long as the user has access to view the
@@ -2510,8 +2546,8 @@ function akismet_action_info() {
 /**
  * Unpublishes a comment.
  *
- * @param $comment
- *   An optional comment object.
+ * @param Comment $comment
+ *   A comment object.
  * @param array $context
  *   Array with components:
  *   - 'cid': Comment ID. Required if $comment is not given.
@@ -2535,7 +2571,7 @@ function akismet_comment_unpublish_action($comment, $context) {
  *
  * @param Node $node
  *   A node entity.
- * @param $context
+ * @param array $context
  *   Contextual information about the triggered action..
  *
  * @ingroup actions
@@ -2585,10 +2621,10 @@ function akismet_form_comment_admin_overview_submit($form, &$form_state) {
 /**
  * Gets all callbacks and checks permissions for entities.
  *
- * @param $entity_type
+ * @param string $entity_type
  *   The type of entity to check.
- * @param $entities
- *   An array of entities to check.
+ * @param Entity $entity
+ *   An entity to check.
  *
  * @return array
  *   An indexed array of allowed entities

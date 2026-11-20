@@ -8,10 +8,14 @@
 /**
  * Form builder for report to Akismet form.
  *
- * @param $entity
+ * @param array $form
+ * @param array $form_state
+ * @param string $entity
  *   The entity type of the data to report, e.g. 'node' or 'comment'.
- * @param $id
+ * @param int $id
  *   The entity id the data belongs to.
+ *
+ * @return array
  *
  * @see akismet_report_access()
  */

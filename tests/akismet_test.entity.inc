@@ -13,7 +13,7 @@ class AkismetTest extends Entity {
   /**
    * The ID.
    *
-   * @var integer
+   * @var int
    */
   public $mid;
 

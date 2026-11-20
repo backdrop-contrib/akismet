@@ -47,7 +47,7 @@ abstract class Akismet {
    * @see Akismet::query()
    * @see Akismet::$requestTimeout
    *
-   * @var integer
+   * @var int
    */
   public $requestMaxAttempts = 2;
 
@@ -207,6 +207,12 @@ abstract class Akismet {
     return 500;
   }
 
+  /**
+   * @param array $data
+   * @param string $feedback
+   *
+   * @return string|bool
+   */
   public function sendFeedback($data, $feedback) {
     if (isset($data['server'])) {
       $server = _akismet_prepare_server_vars($data['server']);
@@ -252,6 +258,9 @@ abstract class Akismet {
     return "{$info['platformName']}/{$info['platformVersion']} | {$info['clientName']}/{$info['clientVersion']}";
   }
 
+  /**
+   * @return string
+   */
   abstract public function getSiteURL();
 
   /**
@@ -278,9 +287,9 @@ abstract class Akismet {
   }
 
   /**
-   * @param $method
-   * @param $path
-   * @param $data
+   * @param string $method
+   * @param string $path
+   * @param array $data
    * @param bool $authenticate
    *
    * @return \AkismetResponse|int
@@ -348,12 +357,13 @@ abstract class Akismet {
   /**
    * Prepares an HTTP request to the Akismet server and processes the response.
    *
-   * @param $method
-   * @param $server
-   * @param $path
-   * @param $data
+   * @param string $method
+   * @param string $server
+   * @param string $path
+   * @param array $data
    *
-   * @return
+   * @return \AkismetResponse|int
+   *
    * @throws \AkismetAuthenticationException
    * @throws \AkismetException
    * @throws \AkismetNetworkException
@@ -507,6 +517,11 @@ class AkismetResponse {
    */
   protected $isError;
 
+  /**
+   * Constructor
+   *
+   * @param object $data
+   */
   public function __construct($data) {
     $this->headers = $data->headers;
     $this->body = $data->body;
@@ -533,10 +548,18 @@ class AkismetResponse {
     }
   }
 
+  /**
+   * @param string $name
+   */
   public function __get($name) {
     return $this->{$name};
   }
 
+  /**
+   * Get Akismet GUID
+   *
+   * @return string|false
+   */
   public function guid() {
     if (!empty($this->headers['x-akismet-guid'])) {
       return $this->headers['x-akismet-guid'];
@@ -563,15 +586,15 @@ class AkismetResponse {
  * @see Akismet::query()
  * @see Akismet::handleRequest()
  *
- * @param $message
+ * @param string $message
  *   The Exception message to throw.
- * @param $code
+ * @param int $code
  *   The Exception code.
- * @param $previous
+ * @param Exception|null $previous
  *   (optional) The previous Exception, if any.
- * @param $instance
+ * @param Akismet|null $instance
  *   The Akismet class instance the Exception is thrown in.
- * @param $arguments
+ * @param array $arguments
  *   (optional) A associative array containing information about a performed
  *   HTTP request that failed:
  *   - request: (string) The HTTP method and URI of the performed request; e.g.,
@@ -601,7 +624,7 @@ class AkismetException extends Exception {
   /**
    * Overrides Exception::__construct().
    */
-  function __construct($message = '', $code = 0, Exception $previous = NULL, Akismet $akismet = NULL, array $request_info = array()) {
+  function __construct($message = '', $code = 0, ?Exception $previous = NULL, ?Akismet $akismet = NULL, array $request_info = array()) {
     // Fatal error on PHP <5.3 when passing more arguments to Exception.
     if (version_compare(phpversion(), '5.3') >= 0) {
       parent::__construct($message, $code, $previous);
