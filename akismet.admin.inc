@@ -112,11 +112,23 @@ function akismet_admin_form_list() {
     $rows[] = $row_attributes + array('data' => $row);
   }
 
+  $build['intro'] = array(
+    '#markup' => _akismet_admin_intro(),
+  );
+
   $build['forms'] = array(
     '#theme' => 'table',
     '#header' => $header,
     '#rows' => $rows,
     '#empty' => l(t('Add form'), 'admin/config/content/akismet/add'),
+  );
+
+  $build['help'] = array(
+    '#type' => 'details',
+    '#summary' => t('Help'),
+  );
+  $build['help']['intro'] = array(
+    '#markup' => _akismet_admin_help(),
   );
 
   return $build;
@@ -588,4 +600,39 @@ function akismet_admin_verify_key_ajax_callback($form, &$form_state) {
   }
   $form_state['storage']['akismet_ping'] = $form['access-keys']['ping_holder']['akismet_ping_replace']['response']['#markup'] = $log_message;
   return $form['access-keys']['ping_holder']['akismet_ping_replace'];
+}
+
+/**
+ * @return string
+ */
+function _akismet_admin_intro() {
+  $output = '<p>';
+  $output .= t('All listed forms below are protected by Akismet, unless users are able to <a href="@permissions-url">bypass Akismet\'s protection</a>.', array(
+    '@permissions-url' => url('admin/config/people/permissions', array('fragment' => 'module-akismet')),
+  ));
+  $output .= ' ';
+  $output .= t('You can <a href="@add-form-url">add a form</a> to protect, configure already protected forms, or remove the protection.', array(
+    '@add-form-url' => url('admin/config/content/akismet/add'),
+  ));
+  $output .= '</p>';
+
+  return $output;
+}
+
+/**
+ * @return string
+ */
+function _akismet_admin_help() {
+  $output = '<p>';
+  $output .= t('Allowing users to react, participate and contribute while still keeping your site\'s content under control can be a huge challenge. <a href="@akismet-website">Akismet</a> is a web service that helps you stop spam. When content moderation becomes easier, you have more time and energy to interact with your site visitors and community. For more information, see <a href="@akismet-works">how Akismet works</a>.', array(
+    '@akismet-website' => 'https://akismet.com',
+    '@akismet-works' => 'https://www.akismet.com/how',
+  ));
+  $output .= '</p><p>';
+  $output .= t('Data from your site is processed and stored as explained in the <a href="@akismet-privacy">privacy policy</a> of Akismet\'s parent company, Automattic. It is your responsibility to provide necessary notices and obtain the appropriate consent regarding Akismet\'s use of submitted data.', array(
+    '@akismet-privacy' => 'http://automattic.com/privacy/',
+  ));
+  $output .= '</p>';
+
+  return $output;
 }
