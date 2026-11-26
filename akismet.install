@@ -226,8 +226,6 @@ function akismet_install() {
     db_insert('akismet_form')
       ->from($query)
       ->execute();
-
-    akismet_form_cache(TRUE);
   }
 
   // Point the user to Akismet's settings page after installation.
@@ -272,6 +270,37 @@ function akismet_update_1000() {
   update_variable_del('akismet_log_minimum_severity');
   update_variable_del('akismet_privacy_link');
   update_variable_del('akismet_connection_timeout');
+}
+
+/**
+ * Move akismet form config to CMI.
+ */
+function akismet_update_1001() {
+  if (!db_table_exists('akismet_form')) {
+    return;
+  }
+
+  $results = db_select('akismet_form')
+    ->fields('akismet_form')
+    ->execute()
+    ->fetchAllAssoc('form_id');
+
+  foreach ($results as $form) {
+    $config = config('akismet.form.' . $form->form_id);
+    if ($config->isNew()) {
+      $config->set('form_id', $form->form_id);
+      $config->set('entity', $form->entity);
+      $config->set('bundle', $form->bundle);
+      $config->set('mode', $form->mode);
+      $config->set('unsure', $form->unsure);
+      $config->set('discard', $form->discard);
+      $config->set('enabled_fields', unserialize($form->enabled_fields));
+      $config->set('module', $form->module);
+      $config->save();
+    }
+  }
+
+  db_drop_table('akismet_form');
 }
 
 /*

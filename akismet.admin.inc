@@ -36,9 +36,6 @@ function akismet_admin_form_list() {
   akismet_admin_site_status();
   _akismet_testing_mode_warning();
 
-  // Reset the cached list of protected forms.
-  akismet_form_cache(TRUE);
-
   $modes = array(
     AKISMET_MODE_ANALYSIS => t('Text analysis'),
   );
@@ -48,10 +45,11 @@ function akismet_admin_form_list() {
     t('Protection mode'),
     array('data' => t('Operations'), 'colspan' => 2),
   );
-  $result = db_query('SELECT form_id FROM {akismet_form}')->fetchCol();
+  $config_names = config_get_names_with_prefix('akismet.form.');
   $forms = array();
   $module_info = (array) system_get_info('module');
-  foreach ($result as $form_id) {
+  foreach ($config_names as $config_name) {
+    $form_id = str_replace('akismet.form.', '', $config_name);
     $forms[$form_id] = akismet_form_load($form_id);
     // system_get_info() only supports enabled modules. Default to the module's
     // machine name in case it is disabled.
@@ -144,8 +142,9 @@ function akismet_admin_form_options() {
   $form_list = akismet_form_list();
 
   // Remove already configured form ids.
-  $result = db_query('SELECT form_id FROM {akismet_form}')->fetchCol();
-  foreach ($result as $form_id) {
+  $config_names = config_get_names_with_prefix('akismet.form.');
+  foreach ($config_names as $config_name) {
+    $form_id = str_replace('akismet.form.', '', $config_name);
     unset($form_list[$form_id]);
   }
   // If all registered forms are configured already, output a message, and
@@ -382,7 +381,7 @@ function akismet_admin_configure_form_submit($form, &$form_state) {
   $akismet_form['enabled_fields'] = $enabled_fields;
 
   $status = akismet_form_save($akismet_form);
-  if ($status === SAVED_NEW) {
+  if ($status) {
     backdrop_set_message(t('The form protection has been added.'));
   }
   else {
