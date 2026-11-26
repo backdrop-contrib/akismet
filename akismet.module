@@ -74,6 +74,11 @@ function akismet_config_info() {
     'label' => t('Akismet settings'),
     'group' => t('Configuration'),
   );
+  $prefixes['akismet.form'] = array(
+    'name_key' => 'form_id',
+    'label_key' => 'form_id',
+    'group' => t('Akismet forms'),
+  );
   return $prefixes;
 }
 
@@ -240,7 +245,13 @@ function akismet_modules_installed($modules) {
  * Implements hook_modules_uninstalled().
  */
 function akismet_modules_uninstalled($modules) {
-  db_delete('akismet_form')->condition('module', $modules)->execute();
+  $config_names = config_get_names_with_prefix('akismet.form.');
+  foreach ($config_names as $config_name) {
+    $config = config($config_name);
+    if (in_array($config->get('module'), $modules)) {
+      $config->delete();
+    }
+  }
 }
 
 /**
@@ -579,15 +590,19 @@ function akismet_form_alter(&$form, &$form_state, $form_id) {
     // But not all of its bundles may be protected. We therefore need to figure
     // out whether the bundle of the entity being deleted is protected - which
     // is a reverse-mapping that does not exist in D7.
-    $is_protected = TRUE;
+    $is_protected = FALSE;
     $is_entity = !empty($form_info['entity']);
     $has_entity_argument = isset($form_state['build_info']['args'][0]) && is_object($form_state['build_info']['args'][0]);
     if ($is_entity && $has_entity_argument) {
       list(, , $bundle) = entity_extract_ids($form_info['entity'], $form_state['build_info']['args'][0]);
-      $is_protected = db_query_range('SELECT 1 FROM {akismet_form} WHERE entity = :entity AND bundle = :bundle', 0, 1, array(
-        ':entity' => $form_info['entity'],
-        ':bundle' => $bundle,
-      ))->fetchField();
+
+      $config_names = config_get_names_with_prefix('akismet.form.');
+      foreach ($config_names as $config_name) {
+        $config = config($config_name);
+        if ($config->get('entity') == $form_info['entity'] && $config->get('bundle') == $bundle) {
+          $is_protected = TRUE;
+        }
+      }
     }
     if (!$is_protected) {
       return;
@@ -612,11 +627,12 @@ function akismet_form_alter(&$form, &$form_state, $form_id) {
 }
 
 /**
- * Returns a cached mapping of protected and delete confirmation form ids.
+ * Returns a static cached mapping of protected and delete confirmation form
+ * ids.
  *
  * @param bool $reset
- *   (optional) Boolean whether to reset the static cache, flush the database
- *   cache, and return nothing (TRUE). Defaults to FALSE.
+ *   (optional) Boolean whether to reset the static cache,
+ *   and return nothing (TRUE). Defaults to FALSE.
  *
  * @return array
  *   An associative array containing:
@@ -638,9 +654,6 @@ function akismet_form_cache($reset = FALSE) {
   $forms = &backdrop_static(__FUNCTION__);
 
   if ($reset) {
-    // This catches both 'akismet:form_cache' as well as akismet_form_load()'s
-    // 'akismet:form:*' entries.
-    cache_clear_all('akismet:form', 'cache', TRUE);
     unset($forms);
     return;
   }
@@ -649,12 +662,14 @@ function akismet_form_cache($reset = FALSE) {
     return $forms;
   }
 
-  if ($cache = cache_get('akismet:form_cache')) {
-    $forms = $cache->data;
-    return $forms;
+  $config_names = config_get_names_with_prefix('akismet.form.');
+  $protected = array();
+  foreach ($config_names as $config_name) {
+    $config = config($config_name);
+    $protected[$config->get('form_id')] = $config->get('module');
   }
 
-  $forms['protected'] = db_query("SELECT form_id, module FROM {akismet_form}")->fetchAllKeyed();
+  $forms['protected'] = $protected;
 
   // Build a list of delete confirmation forms of entities integrating with
   // Akismet, so we are able to alter the delete confirmation form to display
@@ -675,7 +690,6 @@ function akismet_form_cache($reset = FALSE) {
       }
     }
   }
-  cache_set('akismet:form_cache', $forms);
 
   return $forms;
 }
@@ -837,36 +851,27 @@ function akismet_form_new($form_id) {
  * @return array
  */
 function akismet_form_load($form_id) {
-  $cid = 'akismet:form:' . $form_id;
-  if ($cache = cache_get($cid)) {
-    return $cache->data;
+  $akismet_form = config_get('akismet.form.' . $form_id);
+  if ($akismet_form) {
+    // Attach form registry information.
+    $form_info = akismet_form_info($form_id, $akismet_form['module']);
+    $akismet_form += $form_info;
+
+    // Override entity type and bundle information with current values from
+    // the form registry. These properties were originally not stored in
+    // akismet.form and only introduced in 7.x-2.2. The update path is only
+    // able to map entity types/bundles in Backdrop core. Any other form
+    // protections need to be updated manually. That is the situation in which
+    // $akismet_form has NULL values from the database, but the form registry
+    // actually contains the proper values.
+    // @todo Remove in later versions.
+    // @todo Clean up _list() + _info() hook API design and pass the base
+    //   $form_info from _list() into _info(), so that it extends that
+    //   definition instead of replacing it.
+    $akismet_form['entity'] = $form_info['entity'];
+    $akismet_form['bundle'] = $form_info['bundle'];
   }
-  else {
-    $akismet_form = db_query('SELECT * FROM {akismet_form} WHERE form_id = :form_id', array(':form_id' => $form_id))->fetchAssoc();
-    if ($akismet_form) {
-      $akismet_form['enabled_fields'] = unserialize($akismet_form['enabled_fields']);
 
-      // Attach form registry information.
-      $form_info = akismet_form_info($form_id, $akismet_form['module']);
-      $akismet_form += $form_info;
-
-      // Override entity type and bundle information with current values from
-      // the form registry. These properties were originally not stored in
-      // {akismet_form} and only introduced in 7.x-2.2. The update path is only
-      // able to map entity types/bundles in Backdrop core. Any other form
-      // protections need to be updated manually. That is the situation in which
-      // $akismet_form has NULL values from the database, but the form registry
-      // actually contains the proper values.
-      // @todo Remove in later versions.
-      // @todo Clean up _list() + _info() hook API design and pass the base
-      //   $form_info from _list() into _info(), so that it extends that
-      //   definition instead of replacing it.
-      $akismet_form['entity'] = $form_info['entity'];
-      $akismet_form['bundle'] = $form_info['bundle'];
-
-      cache_set($cid, $akismet_form);
-    }
-  }
   return $akismet_form;
 }
 
@@ -879,11 +884,20 @@ function akismet_form_load($form_id) {
  * @return int|false
  */
 function akismet_form_save(&$akismet_form) {
-  $exists = db_query_range('SELECT 1 FROM {akismet_form} WHERE form_id = :form_id', 0, 1, array(':form_id' => $akismet_form['form_id']))->fetchField();
-  $status = backdrop_write_record('akismet_form', $akismet_form, ($exists ? 'form_id' : array()));
+  $config = config('akismet.form.' . $akismet_form['form_id']);
+  $is_new = $config->isNew();
+  $config->set('form_id', $akismet_form['form_id']);
+  $config->set('entity', $akismet_form['entity']);
+  $config->set('bundle', $akismet_form['bundle']);
+  $config->set('mode', $akismet_form['mode']);
+  $config->set('unsure', $akismet_form['unsure']);
+  $config->set('discard', $akismet_form['discard']);
+  $config->set('enabled_fields', $akismet_form['enabled_fields']);
+  $config->set('module', $akismet_form['module']);
+  $config->save();
 
   // Allow modules to react on saved form configurations.
-  if ($status === SAVED_NEW) {
+  if ($is_new) {
     module_invoke_all('akismet_form_insert', $akismet_form);
   }
   else {
@@ -893,7 +907,7 @@ function akismet_form_save(&$akismet_form) {
   // Flush cached Akismet forms and the Akismet form mapping cache.
   akismet_form_cache(TRUE);
 
-  return $status;
+  return $is_new;
 }
 
 /**
@@ -904,9 +918,8 @@ function akismet_form_save(&$akismet_form) {
 function akismet_form_delete($form_id) {
   $akismet_form = akismet_form_load($form_id);
 
-  db_delete('akismet_form')
-    ->condition('form_id', $form_id)
-    ->execute();
+  $config = config('akismet.form.' . $form_id);
+  $config->delete();
 
   // Allow modules to react on saved form configurations.
   module_invoke_all('akismet_form_delete', $akismet_form);
@@ -1174,7 +1187,7 @@ function _akismet_flatten_form_values($values) {
  *
  * @param string $type
  *   The type of entity to check.
- * @param array $bundle
+ * @param array $bundles
  *   An array of bundle names to check.
  *
  * @return array
@@ -1190,10 +1203,14 @@ function _akismet_get_entity_forms_protected($type, $bundles = array()) {
   $protected_bundles = array();
   foreach ($bundles as $bundle) {
     if (!isset($protected[$type][$bundle])) {
-      $protected[$type][$bundle] = db_query_range('SELECT 1 FROM {akismet_form} WHERE entity = :entity AND bundle = :bundle', 0, 1, array(
-        ':entity' => $type,
-        ':bundle' => isset($bundle) ? $bundle : $type,
-      ))->fetchField();
+      $config_names = config_get_names_with_prefix('akismet.form.');
+      foreach ($config_names as $config_name) {
+        $config = config($config_name);
+        $bundle = isset($bundle) ? $bundle : $type;
+        if ($config->get('entity') == $type && $config->get('bundle') == $bundle) {
+          $protected[$type][$bundle] = 1;
+        }
+      }
     }
     if (!empty($protected[$type][$bundle])) {
       $protected_bundles[] = $bundle;
@@ -1945,7 +1962,7 @@ function akismet_get_statistics($refresh = FALSE) {
       foreach ($statistics as $statistic) {
         // @todo the method does not exist - either create one based on Akismet
         // API or remove.
-        /** @var Akismet */
+        /** @var Akismet $result */
         $result = akismet()->getStatistics(array('type' => $statistic));
         if ($result === Akismet::NETWORK_ERROR || $result === Akismet::AUTH_ERROR) {
           // If there was an error, stop fetching statistics and store FALSE
@@ -1978,7 +1995,12 @@ function akismet_get_statistics($refresh = FALSE) {
  */
 function akismet_field_extra_fields() {
   $extras = array();
-  $forms = array_flip(db_query('SELECT form_id FROM {akismet_form}')->fetchCol());
+  $forms = array();
+  $config_names = config_get_names_with_prefix('akismet.form.');
+  foreach ($config_names as $config_name) {
+    $form_id = str_replace('akismet.form.', '', $config_name);
+    $forms[$form_id] = $form_id;
+  }
   foreach (akismet_form_list() as $form_id => $info) {
     // @todo Technically, an 'entity' does not need to be a Entity/Field API
     //   kind of entity. Ideally of course, developers should use fieldable

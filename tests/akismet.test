@@ -331,7 +331,7 @@ class AkismetWebTestCase extends BackdropWebTestCase {
    *   (optional) An associative array of properties to additionally set on the
    *   akismet_form entity.
    *
-   * @return int
+   * @return bool
    *   The save status, as returned by akismet_form_save().
    */
   protected function setProtection($form_id, $mode = AKISMET_MODE_ANALYSIS, $values = array()) {
@@ -365,7 +365,8 @@ class AkismetWebTestCase extends BackdropWebTestCase {
     // Always start from overview page, also to make debugging easier.
     $this->backdropGet('admin/config/content/akismet');
     // Determine whether the form is already protected.
-    $exists = db_query_range('SELECT 1 FROM {akismet_form} WHERE form_id = :form_id', 0, 1, array(':form_id' => $form_id))->fetchField();
+    $config = config('akismet.form.' . $form_id);
+    $exists = !$config->isNew();
     // Add a new form.
     if (!$exists) {
       $this->clickLink(t('Add form'));
@@ -411,7 +412,8 @@ class AkismetWebTestCase extends BackdropWebTestCase {
    */
   protected function delProtection($form_id) {
     // Determine whether the form is protected.
-    $exists = db_query_range('SELECT 1 FROM {akismet_form} WHERE form_id = :form_id', 0, 1, array(':form_id' => $form_id));
+    $config = config('akismet.form.' . $form_id);
+    $exists = !$config->isNew();
     if ($exists) {
       $this->backdropGet('admin/config/content/akismet/unprotect/' . $form_id);
       $this->assertText(t('Akismet will no longer protect this form from spam.'), t('Unprotect confirmation form found.'));
@@ -1661,7 +1663,8 @@ class AkismetFormConfigurationTestCase extends AkismetWebTestCase {
       $this->assertNoLinkByHref('admin/config/content/akismet/unprotect/' . $form_id);
     }
     // Confirm deletion.
-    $count = db_query('SELECT 1 FROM {akismet_form}')->fetchField();
+    $config_names = config_get_names_with_prefix('akismet.form.');
+    $count = count($config_names);
     $this->assertFalse($count, 'No forms found.');
   }
 }
